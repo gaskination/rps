@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPS Battle Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Roboto', sans-serif;
+            background-color: #050510;
+            color: white;
+        }
+
+        /* --- Northern Lights Animation --- */
+        .aurora-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .aurora {
+            position: absolute;
+            left: -50%;
+            top: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, transparent 0%, #050510 70%),
+                        linear-gradient(45deg, rgba(0, 255, 128, 0.1) 0%, rgba(0, 128, 255, 0.1) 50%, rgba(128, 0, 255, 0.1) 100%);
+            filter: blur(60px);
+            animation: aurora-move 20s infinite alternate linear;
+            opacity: 0.6;
+        }
+
+        .aurora:nth-child(2) {
+            animation-duration: 15s;
+            animation-direction: alternate-reverse;
+            background: radial-gradient(circle at center, transparent 0%, #050510 70%),
+                        linear-gradient(-45deg, rgba(255, 0, 128, 0.15) 0%, rgba(0, 255, 255, 0.15) 50%, rgba(0, 255, 100, 0.15) 100%);
+        }
+
+        .aurora:nth-child(3) {
+            animation-duration: 25s;
+            background: radial-gradient(circle at bottom right, rgba(50, 255, 50, 0.1), transparent 60%);
+            transform-origin: bottom right;
+        }
+
+        @keyframes aurora-move {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(5deg) scale(1.1); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+
+        /* --- Game Elements --- */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            touch-action: none;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- UI Overlay --- */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            pointer-events: none; 
+        }
+
+        /* Collapsible Side Panel */
+        .controls-wrapper {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 50;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .settings-toggle-btn {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .settings-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.05);
+        }
+
+        .controls-container {
+            width: 300px;
+            padding: 20px;
+            transform-origin: bottom left;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: scale(0.9) translateX(-20px);
+            pointer-events: none;
+            visibility: hidden;
+            position: absolute;
+            bottom: 60px; /* Above the toggle button */
+            left: 0;
+        }
+
+        .controls-container.open {
+            opacity: 1;
+            transform: scale(1) translateX(0);
+            pointer-events: auto;
+            visibility: visible;
+        }
+
+        .score-board {
+            pointer-events: auto;
+            margin: 20px;
+            padding: 15px 25px;
+            display: flex;
+            gap: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            justify-content: center;
+            position: relative;
+            z-index: 20;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: transparent; 
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+        }
+
+        /* --- Epic Win Screen --- */
+        #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 30;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+
+        #win-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .epic-text {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px currentColor;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); }
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+        
+        .stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="aurora-container">
+        <div class="aurora"></div>
+        <div class="aurora"></div>
+        <div class="aurora"></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <!-- Top Score Board -->
+        <div class="w-full flex justify-center">
+            <div class="glass-panel score-board">
+                <div class="stat-badge" style="color: #FFD700;">
+                    <span>🪨</span> <span id="count-rock">0</span>
+                </div>
+                <div class="stat-badge text-white">
+                    <span>📄</span> <span id="count-paper">0</span>
+                </div>
+                <div class="stat-badge text-red-400">
+                    <span>✂️</span> <span id="count-scissors">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Wrapper (Bottom Left) -->
+        <div class="controls-wrapper">
+            
+            <!-- Collapsible Panel -->
+            <div id="controls-panel" class="controls-container glass-panel">
+                <div class="flex justify-between items-center mb-4 border-b border-gray-600 pb-2">
+                    <h2 class="text-xl font-bold">Settings</h2>
+                    <button id="btn-close-settings" class="text-gray-400 hover:text-white text-xl">&times;</button>
+                </div>
+                
+                <div class="control-row">
+                    <label>🪨 Rocks <span id="val-rock" class="text-xs opacity-70">(5)</span></label>
+                    <input type="range" id="in-rock" min="3" max="10" value="5" class="w-24">
+                </div>
+                
+                <div class="control-row">
+                    <label>📄 Papers <span id="val-paper" class="text-xs opacity-70">(5)</span></label>
+                    <input type="range" id="in-paper" min="3" max="10" value="5" class="w-24">
+                </div>
+                
+                <div class="control-row">
+                    <label>✂️ Scissors <span id="val-scissors" class="text-xs opacity-70">(5)</span></label>
+                    <input type="range" id="in-scissors" min="3" max="10" value="5" class="w-24">
+                </div>
+                
+                <div class="h-px bg-gray-600 my-3"></div>
+
+                <div class="control-row">
+                    <label>Speed</label>
+                    <input type="range" id="in-speed" min="1" max="10" value="5" class="w-24">
+                </div>
+                
+                <div class="control-row">
+                    <label>Size</label>
+                    <input type="range" id="in-size" min="20" max="60" value="35" class="w-24">
+                </div>
+
+                <button id="btn-restart" class="w-full mt-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-bold shadow-lg transform transition hover:scale-105 active:scale-95">
+                    Force Restart
+                </button>
+            </div>
+
+            <!-- Toggle Button -->
+            <button id="btn-toggle-settings" class="settings-toggle-btn">
+                <span class="text-xl">⚙️</span> Settings
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="win-screen">
+        <div id="winner-icon" class="text-9xl mb-6">🏆</div>
+        <h1 id="winner-text" class="epic-text" style="color: gold;">ROCK DOMINATION</h1>
+        <p class="text-xl text-gray-300 mb-8">Order has been restored.</p>
+        <button id="btn-play-again" class="px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-gray-200 transition transform hover:scale-110">
+            Play Again
+        </button>
+    </div>
+
+    <script>
+        /**
+         * Configuration & Constants
+         */
+        const TYPES = {
+            ROCK: 0,
+            PAPER: 1,
+            SCISSORS: 2
+        };
+
+        const CONFIG = {
+            // Changed ROCK color to Yellow/Gold as requested
+            [TYPES.ROCK]: { icon: '🪨', color: '#FFD700', name: 'ROCK' },
+            [TYPES.PAPER]: { icon: '📄', color: '#eeeeee', name: 'PAPER' },
+            [TYPES.SCISSORS]: { icon: '✂️', color: '#ff4444', name: 'SCISSORS' }
+        };
+
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiCountRock = document.getElementById('count-rock');
+        const uiCountPaper = document.getElementById('count-paper');
+        const uiCountScissors = document.getElementById('count-scissors');
+        const winScreen = document.getElementById('win-screen');
+        const winText = document.getElementById('winner-text');
+        const winIcon = document.getElementById('winner-icon');
+        
+        // Inputs
+        const inputs = {
+            rock: document.getElementById('in-rock'),
+            paper: document.getElementById('in-paper'),
+            scissors: document.getElementById('in-scissors'),
+            speed: document.getElementById('in-speed'),
+            size: document.getElementById('in-size'),
+        };
+
+        // State
+        let entities = [];
+        let animationId;
+        let gameActive = true;
+        let width, height;
+        let globalSpeed = 3; 
+        let entityRadius = 25; 
+
+        /**
+         * Entity Class
+         */
+        class Entity {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * globalSpeed * 2;
+                this.vy = (Math.random() - 0.5) * globalSpeed * 2;
+                this.type = type;
+                this.mass = 1;
+                if (Math.abs(this.vx) < 0.5) this.vx = 1; 
+                if (Math.abs(this.vy) < 0.5) this.vy = 1;
+            }
+
+            update() {
+                const speedMag = Math.hypot(this.vx, this.vy);
+                if (speedMag > 0) {
+                    const scale = (globalSpeed * (0.8 + Math.random() * 0.4)) / speedMag; 
+                    if (Math.abs(speedMag - globalSpeed) > 2) {
+                        this.vx *= scale;
+                        this.vy *= scale;
+                    }
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wall Bouncing
+                if (this.x - entityRadius < 0) {
+                    this.x = entityRadius;
+                    this.vx *= -1;
+                } else if (this.x + entityRadius > width) {
+                    this.x = width - entityRadius;
+                    this.vx *= -1;
+                }
+
+                if (this.y - entityRadius < 0) {
+                    this.y = entityRadius;
+                    this.vy *= -1;
+                } else if (this.y + entityRadius > height) {
+                    this.y = height - entityRadius;
+                    this.vy *= -1;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, entityRadius, 0, Math.PI * 2);
+                
+                // DISTINCTIVE BORDER (Yellow for Rock)
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = CONFIG[this.type].color;
+                ctx.stroke();
+                
+                ctx.closePath();
+
+                ctx.font = `${Math.floor(entityRadius * 1.2)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'black'; 
+                ctx.fillText(CONFIG[this.type].icon, this.x, this.y + (entityRadius * 0.1));
+            }
+        }
+
+        /**
+         * Game Logic
+         */
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function initGame() {
+            gameActive = true;
+            winScreen.classList.remove('active');
+            stopConfetti();
+            
+            entities = [];
+            
+            // Update global settings
+            globalSpeed = parseInt(inputs.speed.value) || 5;
+            entityRadius = (parseInt(inputs.size.value) || 35) / 2;
+
+            const counts = {
+                [TYPES.ROCK]: parseInt(inputs.rock.value),
+                [TYPES.PAPER]: parseInt(inputs.paper.value),
+                [TYPES.SCISSORS]: parseInt(inputs.scissors.value)
+            };
+
+            // Spawn entities
+            [TYPES.ROCK, TYPES.PAPER, TYPES.SCISSORS].forEach(type => {
+                for (let i = 0; i < counts[type]; i++) {
+                    let x, y, overlapping;
+                    let attempts = 0;
+                    do {
+                        overlapping = false;
+                        x = Math.random() * (width - entityRadius * 2) + entityRadius;
+                        y = Math.random() * (height - entityRadius * 2) + entityRadius;
+                        
+                        for (let other of entities) {
+                            const dist = Math.hypot(x - other.x, y - other.y);
+                            if (dist < entityRadius * 2.2) {
+                                overlapping = true;
+                                break;
+                            }
+                        }
+                        attempts++;
+                    } while (overlapping && attempts < 100);
+                    
+                    entities.push(new Entity(x, y, type));
+                }
+            });
+
+            updateScoreboard();
+        }
+
+        function resolveCollisions() {
+            for (let i = 0; i < entities.length; i++) {
+                for (let j = i + 1; j < entities.length; j++) {
+                    const p1 = entities[i];
+                    const p2 = entities[j];
+
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist < entityRadius * 2) {
+                        // Overlap
+                        const overlap = (entityRadius * 2 - dist) / 2;
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        
+                        p1.x -= nx * overlap;
+                        p1.y -= ny * overlap;
+                        p2.x += nx * overlap;
+                        p2.y += ny * overlap;
+
+                        // Elastic Bounce
+                        const v1n = p1.vx * nx + p1.vy * ny;
+                        const v2n = p2.vx * nx + p2.vy * ny;
+                        const tx = -ny;
+                        const ty = nx;
+                        const v1t = p1.vx * tx + p1.vy * ty;
+                        const v2t = p2.vx * tx + p2.vy * ty;
+
+                        p1.vx = v2n * nx + v1t * tx;
+                        p1.vy = v2n * ny + v1t * ty;
+                        p2.vx = v1n * nx + v2t * tx;
+                        p2.vy = v1n * ny + v2t * ty;
+
+                        // Battle
+                        if (p1.type !== p2.type) {
+                            resolveBattle(p1, p2);
+                        }
+                    }
+                }
+            }
+        }
+
+        function resolveBattle(p1, p2) {
+            let winner, loser;
+            if (p1.type === p2.type) return;
+
+            if (
+                (p1.type === TYPES.ROCK && p2.type === TYPES.SCISSORS) ||
+                (p1.type === TYPES.SCISSORS && p2.type === TYPES.PAPER) ||
+                (p1.type === TYPES.PAPER && p2.type === TYPES.ROCK)
+            ) {
+                winner = p1;
+                loser = p2;
+            } else {
+                winner = p2;
+                loser = p1;
+            }
+
+            loser.type = winner.type;
+            updateScoreboard();
+            checkWinCondition();
+        }
+
+        function updateScoreboard() {
+            const counts = { 0: 0, 1: 0, 2: 0 };
+            entities.forEach(e => counts[e.type]++);
+            
+            uiCountRock.innerText = counts[0];
+            uiCountPaper.innerText = counts[1];
+            uiCountScissors.innerText = counts[2];
+
+            return counts;
+        }
+
+        function checkWinCondition() {
+            if (!gameActive) return;
+
+            const counts = updateScoreboard();
+            const total = entities.length;
+
+            if (counts[TYPES.ROCK] === total) triggerWin(TYPES.ROCK);
+            else if (counts[TYPES.PAPER] === total) triggerWin(TYPES.PAPER);
+            else if (counts[TYPES.SCISSORS] === total) triggerWin(TYPES.SCISSORS);
+        }
+
+        function triggerWin(winningType) {
+            gameActive = false;
+            const config = CONFIG[winningType];
+            
+            winIcon.innerText = "🏆 " + config.icon + " 🏆";
+            winText.innerText = config.name + " DOMINATION";
+            winText.style.color = config.color;
+            
+            winScreen.classList.add('active');
+            startConfetti(config.color);
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, width, height);
+
+            if (gameActive) {
+                entities.forEach(e => e.update());
+                resolveCollisions();
+            }
+            entities.forEach(e => e.draw());
+            animationId = requestAnimationFrame(loop);
+        }
+
+        let confettiInterval;
+        function startConfetti(color) {
+            stopConfetti();
+            confettiInterval = setInterval(() => {
+                const el = document.createElement('div');
+                el.classList.add('confetti');
+                el.style.left = Math.random() * 100 + 'vw';
+                el.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                el.style.backgroundColor = Math.random() > 0.5 ? color : '#fff';
+                if(Math.random() > 0.5) el.style.borderRadius = '50%';
+                winScreen.appendChild(el);
+                setTimeout(() => el.remove(), 4000);
+            }, 50);
+        }
+
+        function stopConfetti() {
+            if (confettiInterval) clearInterval(confettiInterval);
+            const existing = document.querySelectorAll('.confetti');
+            existing.forEach(e => e.remove());
+        }
+
+        /**
+         * Event Listeners
+         */
+        window.addEventListener('resize', resize);
+
+        // Update Labels and RESTART GAME on any change
+        ['rock', 'paper', 'scissors', 'speed', 'size'].forEach(key => {
+            inputs[key].addEventListener('input', () => {
+                // Update label if it's a count
+                if(['rock', 'paper', 'scissors'].includes(key)) {
+                    document.getElementById(`val-${key}`).innerText = `(${inputs[key].value})`;
+                }
+                // Instant Restart
+                initGame();
+            });
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', initGame);
+        document.getElementById('btn-play-again').addEventListener('click', initGame);
+
+        // Settings Panel Logic
+        const btnToggle = document.getElementById('btn-toggle-settings');
+        const btnClose = document.getElementById('btn-close-settings');
+        const panel = document.getElementById('controls-panel');
+
+        function toggleSettings() {
+            panel.classList.toggle('open');
+        }
+
+        btnToggle.addEventListener('click', toggleSettings);
+        btnClose.addEventListener('click', toggleSettings);
+
+        // Initialization
+        resize();
+        initGame();
+        loop();
+
+    </script>
+</body>
+</html>
